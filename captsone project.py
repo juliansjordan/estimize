@@ -83,7 +83,6 @@ consensus = consensus[consensus['datediff_in_days'] < 500] #removes long-term es
 consensus = consensus[consensus['eps_diff_percent_abs'] < 5] #removes some outliers (what should be the right cutoffs)
 consensus = consensus[consensus['rev_diff_percent_abs'] < 5] # same as above
 
-
 #%% Extract List of Stocks of Interest (had no wall street est at some stage)
 
 cons_tickers = consensus[consensus['ws_flag'] != True]
@@ -93,6 +92,11 @@ tickers = tickers.to_series()
 
 #%% Extract rows with these tickers from the original dataset into new dataset
 
+new_cons = consensus[consensus['ticker'].isin(tickers)]
+cons_tickers = new_cons[new_cons['ws_flag'] == True]
+tickers = cons_tickers.groupby(['ticker'])['ticker'].nunique()
+tickers = tickers.index
+tickers = tickers.to_series()
 new_cons = consensus[consensus['ticker'].isin(tickers)]
 
 #%% Initial Analysis to see if erros vary between our ws flag
@@ -113,6 +117,7 @@ eps_ols1.summary() #R2 is low (but not a big deal bc we aren't predicting), P-va
 
 eps_ols2 = smf.ols('rev_diff_percent_abs ~ C(ws_dummy) + datediff_in_days', data = new_cons).fit()
 eps_ols2.summary() #similar takeaways as above
+
 
 #%% Next Steps
 

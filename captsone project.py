@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
 """
 Created on Mon Apr 12 07:05:17 2021
-
 @author: full team
 """
 
@@ -46,14 +44,15 @@ consensus['datediff_in_days'] = consensus['datediff'].dt.days
 
 #Difference between values in estimize vs. wallstreet
 #EPS
-consensus['eps_diff_abs'] = consensus['estimize.eps.weighted'] - consensus['actual.eps']
+consensus['eps_diff'] = consensus['estimize.eps.weighted'] - consensus['actual.eps']
+#consensus['eps_diff_abs'] = consensus['eps_diff'].abs()
 consensus['eps_diff_percent'] = (consensus['estimize.eps.weighted'] - consensus['actual.eps'])/consensus['actual.eps']
-consensus['eps_diff_percent_abs'] = consensus['eps_diff_percent'].abs
+consensus['eps_diff_percent_abs'] = consensus[['eps_diff_percent']].abs()
 
 #Revenue
 consensus['rev_diff_abs'] = consensus['estimize.revenue.weighted'] - consensus['actual.revenue']
 consensus['rev_diff_percent'] = (consensus['estimize.revenue.weighted'] - consensus['actual.revenue'])/consensus['actual.revenue']
-consensus['rev_diff_percent_abs'] = consensus['eps_diff_percent'].abs
+consensus['rev_diff_percent_abs'] = consensus[['rev_diff_percent']].abs()
 
 
 
@@ -104,6 +103,8 @@ new_cons = consensus[consensus['ticker'].isin(tickers)]
 
 new_cons.groupby(['ws_flag'])['eps_diff_percent_abs'].mean() # shows a significant difference in average absolute error in expected direction
 new_cons.groupby(['ws_flag'])['rev_diff_percent_abs'].mean() # same as above
+
+###box plot with true false for each
 
 #%% Run regression to test for size and significance of the dummy coefficient
 

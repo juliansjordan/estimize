@@ -54,6 +54,18 @@ consensus['rev_diff_abs'] = consensus['estimize.revenue.weighted'] - consensus['
 consensus['rev_diff_percent'] = (consensus['estimize.revenue.weighted'] - consensus['actual.revenue'])/consensus['actual.revenue']
 consensus['rev_diff_percent_abs'] = consensus[['rev_diff_percent']].abs()
 
+#WS Figures
+#EPS
+
+consensus['eps_diff_ws'] = consensus['wallstreet.eps'] - consensus['actual.eps']
+#consensus['eps_diff_abs'] = consensus['eps_diff'].abs()
+consensus['eps_diff_percent_ws'] = (consensus['wallstreet.eps'] - consensus['actual.eps'])/consensus['actual.eps']
+consensus['eps_diff_percent_ws_abs'] = consensus[['eps_diff_percent_ws']].abs()
+
+#Revenue
+consensus['rev_diff_ws'] = consensus['wallstreet.revenue'] - consensus['actual.revenue']
+consensus['rev_diff_percent_ws'] = (consensus['wallstreet.revenue'] - consensus['actual.revenue'])/consensus['actual.revenue']
+consensus['rev_diff_percent_ws_abs'] = consensus[['rev_diff_percent_ws']].abs()
 
 
 #%%Exploratory data analysis
@@ -82,6 +94,18 @@ consensus = consensus[consensus['datediff_in_days'] < 500] #removes long-term es
 consensus = consensus[consensus['eps_diff_percent_abs'] < 5] #removes some outliers (what should be the right cutoffs)
 consensus = consensus[consensus['rev_diff_percent_abs'] < 5] # same as above
 
+#%%Boxplots galore
+cons_ws_yes = consensus[consensus['ws_flag'] == True]
+cons_ws_no = consensus[consensus['ws_flag'] != True]
+
+#EPS Flag
+   
+    eps = pd.DataFrame(cons_ws_yes['eps_diff_percent'])
+    eps['eps_diff_percent_no'] = cons_ws_no['eps_diff_percent']
+    
+    eps.boxplot(column=['eps_diff_percent','eps_diff_percent_no'])
+                                   
+
 
 #%% Extract List of Stocks of Interest (had no wall street est at some stage)
 
@@ -101,8 +125,8 @@ new_cons = consensus[consensus['ticker'].isin(tickers)]
 
 #%% Initial Analysis to see if erros vary between our ws flag
 
-new_cons.groupby(['ws_flag'])['eps_diff_percent_abs'].mean() # shows a significant difference in average absolute error in expected direction
-new_cons.groupby(['ws_flag'])['rev_diff_percent_abs'].mean() # same as above
+new_cons.groupby(['ws_flag'])['eps_diff_percent_abs','eps_diff_percent_ws_abs'].mean() # shows a significant difference in average absolute error in expected direction
+new_cons.groupby(['ws_flag'])['rev_diff_percent_abs','rev_diff_percent_ws_abs'].mean() # same as above
 
 ###box plot with true false for each
 
@@ -112,12 +136,16 @@ new_cons.groupby(['ws_flag'])['rev_diff_percent_abs'].mean() # same as above
 
 cons_dummy = pd.get_dummies(new_cons['ws_flag']) # create dummy variables for the wall street flag
 new_cons['ws_dummy'] = cons_dummy.iloc[:,1] #add dummy variables to the main dataset
+new_cons.rename(columns={"estimize.eps.count":"estimize_eps_count"})
+new_cons['estimize_eps_count'] = new_cons['estimize.eps.count']
+
+new_cons.dtypes
 
 # Set up the regression
-eps_ols1 = smf.ols('eps_diff_percent_abs ~ C(ws_dummy) + datediff_in_days', data = new_cons).fit()
+eps_ols1 = smf.ols('eps_diff_percent_abs ~ C(ws_dummy) + datediff_in_days + estimize_eps_count', data = new_cons).fit()
 eps_ols1.summary() #R2 is low (but not a big deal bc we aren't predicting), P-value is significant and coefficient suggests meaningful change
 
-rev_ols1 = smf.ols('rev_diff_percent_abs ~ C(ws_dummy) + datediff_in_days', data = new_cons).fit()
+rev_ols1 = smf.ols('rev_diff_percent_abs ~ C(ws_dummy) + datediff_in_days + estimize_eps_count', data = new_cons).fit()
 rev_ols1.summary() #similar takeaways as above
 
 #%% Create Sector Segments to view Errors

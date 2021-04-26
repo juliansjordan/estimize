@@ -68,26 +68,48 @@ consensus['rev_diff_percent_ws'] = (consensus['wallstreet.revenue'] - consensus[
 consensus['rev_diff_percent_ws_abs'] = consensus[['rev_diff_percent_ws']].abs()
 
 
-#%% Get only first instances
+# %% Get only first instances
 # Create a consensus_2 df that includes only estimates within 6 months of WS first flag
 
+cutoff = 180   # required days on either side of teh WS flag
+
+# Find first instane a ticker has no wall street estimate
 FirstEST = consensus[['ticker', 'date', 'ws_flag']]
-FirstEST = FirstEST[FirstEST['ws_flag']==False]
+FirstEST = FirstEST[FirstEST['ws_flag'] == False]
 FirstEST = FirstEST.groupby('ticker')['date'].min()
 FirstEST = FirstEST.to_frame()
 
-
+# Get All data with a wall street estimate
 FirstWS = consensus[['ticker', 'date', 'ws_flag']]
-FirstWS = FirstWS[FirstWS['ws_flag']==True]
+FirstWS = FirstWS[FirstWS['ws_flag'] == True]
+
+# Find last instane of wall street estimate
+LastWS = FirstWS.groupby('ticker')['date'].max()
+LastWS = LastWS.to_frame()
+
+# Find first instance of wall street estimate
 FirstWS = FirstWS.groupby('ticker')['date'].min()
 FirstWS = FirstWS.to_frame()
 
+# Merge all wallstreet info
+WSData = FirstWS.merge(LastWS, how='outer', left_on='ticker', right_on='ticker', suffixes=("_Min", " _Max"))
+WSData['WS_Duration'] = WSData['date_Max'] - WSData['date_Min']
+WSData['WS_Duration'] = WSData['WS_Duration'].astype("timedelta64[D]")
 
+# Keep only instanes with a wallstreet coverage duration longer than cutoff
+WSData = WSData.loc[(WSData['WS_Duration']) >= cutoff]
 
-TickerPull = FirstEST.merge(FirstWS, how='left', left_on='ticker', right_on='ticker', suffixes = ("_False","_True"))
+# Merge wall street data with estimize estimate data
+TickerPull = FirstEST.merge(WSData, how='outer', left_on='ticker', right_on='ticker', suffixes=("_False", "_True"))
+TickerPull['EstDur'] = TickerPull['date_Min'] - TickerPull['date']
+TickerPull['EstDur'] = TickerPull['EstDur'].astype("timedelta64[D]")
 
-                            
-#%%
+# Keep only instances with an estimize only duration greater than cutoff
+TickerPull = TickerPull.loc[(TickerPull['EstDur']) >= cutoff]
+         
+                   
+#%% Create DataFrame that has estimates in relation to First instance of WS <-- NEEDS UPDATING BASED ON ABOVE
+
 consensus_2 = consensus.merge(FirstWS, how='left', left_on='ticker', right_on='ticker', suffixes=(None, "_WS"))
 consensus_2['date_to_ws'] = consensus_2['date']-consensus_2['date_WS']
 consensus_2['date_to_ws'] = consensus_2['date_to_ws'].astype("timedelta64[D]")

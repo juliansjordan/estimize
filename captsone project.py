@@ -15,13 +15,13 @@ import statsmodels.api as sm
 import seaborn as sns 
 
 #%%Import files
-file_path = 'C:/Users/jjordan/Documents/Personal/Wharton/FNCE 737/Data/'
+file_path = '/Users/laurendavis/Desktop/Wharton/Spring 2021/Data Science for Finance/Final Project/Raw Data/estimize-equities-2020q4/combined_consensus_new.csv'
 
-consensus = pd.read_csv(file_path+'combined_unadjusted_consensus_new.csv')
+consensus = pd.read_csv(file_path)
 
 consensus.head()
 
-estimates = pd.read_csv(file_path+'combined_unadjusted_estimates_new.csv')
+estimates = pd.read_csv(file_path)
 
 estimates.head()
 estimates.describe()
@@ -68,25 +68,33 @@ consensus['rev_diff_percent_ws'] = (consensus['wallstreet.revenue'] - consensus[
 consensus['rev_diff_percent_ws_abs'] = consensus[['rev_diff_percent_ws']].abs()
 
 
+#%% Get only first instances
+
+FirstWS = consensus[['ticker', 'date', 'ws_flag']]
+FirstWS = FirstWS[FirstWS['ws_flag']==True]
+FirstWS = FirstWS.groupby('ticker')['date'].min()
+
+consensus_2=consensus.merge(FirstWS, how='left', left_on='ticker', right_on='ticker', suffixes=(None, "_WS"))
+consensus_2['date_to_ws']=consensus_2['date']-consensus_2['date_WS']
 #%%Exploratory data analysis
 #Number of unique tickers
-    consensus.groupby(['ticker'])['ticker'].nunique()
+consensus.groupby(['ticker'])['ticker'].nunique()
 
 #Min date
-    consensus['date'].min() ##--> 2010-09-29
-    consensus['date'].max() ##--> 2020-12-30
+consensus['date'].min() ##--> 2010-09-29
+consensus['date'].max() ##--> 2020-12-30
 
 #Get some graphics going
   #Look at ranges in lags in diff between report dates & 
-     consensus.boxplot(column=['datediff_in_days']) #--> seems like there is a large range
-     plt.boxplot(x=consensus['datediff_in_days']) #--> just trying out another metho dof plotting
+consensus.boxplot(column=['datediff_in_days']) #--> seems like there is a large range
+plt.boxplot(x=consensus['datediff_in_days']) #--> just trying out another metho dof plotting
   
   #Look at differences in EPS, revenue  
-      consensus.boxplot(column=['eps_diff_percent', 'rev_diff_percent']) #--> really large differences... need to figure out why the differences are so high
+consensus.boxplot(column=['eps_diff_percent', 'rev_diff_percent']) #--> really large differences... need to figure out why the differences are so high
 
-      consensus.boxplot(column=['eps_diff_abs', 'rev_diff_abs']) #--> really large differences... need to figure out why the differences are so high
+consensus.boxplot(column=['eps_diff_abs', 'rev_diff_abs']) #--> really large differences... need to figure out why the differences are so high
 
-    consensus.boxplot(column=['eps_diff_abs']) #--> we have some bad data; really extreme values that are outliers
+consensus.boxplot(column=['eps_diff_abs']) #--> we have some bad data; really extreme values that are outliers
 
 #%% Addressing Outliers
 
@@ -100,10 +108,10 @@ cons_ws_no = consensus[consensus['ws_flag'] != True]
 
 #EPS Flag
    
-    eps = pd.DataFrame(cons_ws_yes['eps_diff_percent'])
-    eps['eps_diff_percent_no'] = cons_ws_no['eps_diff_percent']
+eps = pd.DataFrame(cons_ws_yes['eps_diff_percent'])
+eps['eps_diff_percent_no'] = cons_ws_no['eps_diff_percent']
     
-    eps.boxplot(column=['eps_diff_percent','eps_diff_percent_no'])
+eps.boxplot(column=['eps_diff_percent','eps_diff_percent_no'])
                                    
 
 

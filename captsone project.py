@@ -71,10 +71,23 @@ consensus['rev_diff_percent_ws_abs'] = consensus[['rev_diff_percent_ws']].abs()
 #%% Get only first instances
 # Create a consensus_2 df that includes only estimates within 6 months of WS first flag
 
+FirstEST = consensus[['ticker', 'date', 'ws_flag']]
+FirstEST = FirstEST[FirstEST['ws_flag']==False]
+FirstEST = FirstEST.groupby('ticker')['date'].min()
+FirstEST = FirstEST.to_frame()
+
+
 FirstWS = consensus[['ticker', 'date', 'ws_flag']]
 FirstWS = FirstWS[FirstWS['ws_flag']==True]
 FirstWS = FirstWS.groupby('ticker')['date'].min()
+FirstWS = FirstWS.to_frame()
 
+
+
+TickerPull = FirstEST.merge(FirstWS, how='left', left_on='ticker', right_on='ticker', suffixes = ("_False","_True"))
+
+                            
+#%%
 consensus_2 = consensus.merge(FirstWS, how='left', left_on='ticker', right_on='ticker', suffixes=(None, "_WS"))
 consensus_2['date_to_ws'] = consensus_2['date']-consensus_2['date_WS']
 consensus_2['date_to_ws'] = consensus_2['date_to_ws'].astype("timedelta64[D]")

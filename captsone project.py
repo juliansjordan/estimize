@@ -69,13 +69,19 @@ consensus['rev_diff_percent_ws_abs'] = consensus[['rev_diff_percent_ws']].abs()
 
 
 #%% Get only first instances
+# Create a consensus_2 df that includes only estimates within 6 months of WS first flag
 
 FirstWS = consensus[['ticker', 'date', 'ws_flag']]
 FirstWS = FirstWS[FirstWS['ws_flag']==True]
 FirstWS = FirstWS.groupby('ticker')['date'].min()
 
-consensus_2=consensus.merge(FirstWS, how='left', left_on='ticker', right_on='ticker', suffixes=(None, "_WS"))
-consensus_2['date_to_ws']=consensus_2['date']-consensus_2['date_WS']
+consensus_2 = consensus.merge(FirstWS, how='left', left_on='ticker', right_on='ticker', suffixes=(None, "_WS"))
+consensus_2['date_to_ws'] = consensus_2['date']-consensus_2['date_WS']
+consensus_2['date_to_ws'] = consensus_2['date_to_ws'].astype("timedelta64[D]")
+consensus_2 = consensus_2.loc[(consensus_2['date_to_ws'].abs() <= 180)]
+
+#Below not what I wanted but an example
+consensus_2.plot.scatter(x='date_to_ws', y = 'eps_diff_percent').set_ylim(-100,100)
 #%%Exploratory data analysis
 #Number of unique tickers
 consensus.groupby(['ticker'])['ticker'].nunique()

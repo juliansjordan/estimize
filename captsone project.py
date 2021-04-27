@@ -92,7 +92,7 @@ FirstWS = FirstWS.groupby('ticker')['date'].min()
 FirstWS = FirstWS.to_frame()
 
 # Merge all wallstreet info
-WSData = FirstWS.merge(LastWS, how='outer', left_on='ticker', right_on='ticker', suffixes=("_Min", " _Max"))
+WSData = FirstWS.merge(LastWS, how='outer', left_on='ticker', right_on='ticker', suffixes=("_Min", "_Max"))
 WSData['WS_Duration'] = WSData['date_Max'] - WSData['date_Min']
 WSData['WS_Duration'] = WSData['WS_Duration'].astype("timedelta64[D]")
 
@@ -106,19 +106,6 @@ TickerPull['EstDur'] = TickerPull['EstDur'].astype("timedelta64[D]")
 
 # Keep only instances with an estimize only duration greater than cutoff
 TickerPull = TickerPull.loc[(TickerPull['EstDur']) >= cutoff]
-         
-                   
-#%% Create DataFrame that has estimates in relation to First instance of WS <-- NEEDS UPDATING BASED ON ABOVE
-
-consensus_2 = consensus.merge(FirstWS, how='left', left_on='ticker', right_on='ticker', suffixes=(None, "_WS"))
-consensus_2['date_to_ws'] = consensus_2['date']-consensus_2['date_WS']
-consensus_2['date_to_ws'] = consensus_2['date_to_ws'].astype("timedelta64[D]")
-consensus_2 = consensus_2.loc[(consensus_2['date_to_ws'].abs() <= 180)]
-
-#Below not what I wanted but an example
-consensus_2.plot.scatter(x='date_to_ws', y = 'eps_diff_percent').set_ylim(-100,100)
-
-#%%Cleaning up data more
 
 # Get earliest, latest reporting dates from consensus data
 estimize_dateRange = consensus.groupby('ticker')['date'].min()
@@ -132,7 +119,7 @@ ticker_analysis_pd = ticker_analysis_pd.rename(columns={"date": "ws_min_date"})
 
 #Pre-period
 
-ticker_analysis_pd['pre_period_length'] = ticker_analysis_pd['ws_min_date'] - ticker_min_preperiod['est_min_date']
+ticker_analysis_pd['pre_period_length'] = ticker_analysis_pd['ws_min_date'] - ticker_analysis_pd['est_min_date']
 ticker_analysis_pd['pre_period_length'] = ticker_analysis_pd['pre_period_length'].dt.days
 
 #Post-period
@@ -148,11 +135,11 @@ tick_analysis_6mo_pd = tick_analysis_6mo_pd.loc[(tick_analysis_6mo_pd['post_peri
 tick_analysis_3mo_pd = ticker_analysis_pd.loc[(ticker_analysis_pd['pre_period_length'])>= (cutoff/2)]
 tick_analysis_3mo_pd = tick_analysis_3mo_pd.loc[(tick_analysis_3mo_pd['post_period_length'])>= (cutoff/2)]
 
-#%%JJ to share with Lauren
+#%%JJ Analysis for Lauren
 #Check to see how many times WS drops coverage
 
-consensus = consensus[consensus['eps_diff_percent_abs'] < 5] #removes some outliers (what should be the right cutoffs)
-consensus = consensus[consensus['rev_diff_percent_abs'] < 5] # same as above
+consensus = consensus[consensus['eps_diff_percent_abs'] < 2] #removes some outliers (what should be the right cutoffs)
+consensus = consensus[consensus['rev_diff_percent_abs'] < 2] # same as above
 
 #Pull consensus data for tickers with 6 month pre & post
 consensus_6mo_analysis_pd = consensus.merge(tick_analysis_6mo_pd, left_on = 'ticker', right_on = 'ticker')
@@ -177,11 +164,11 @@ print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent'
 print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['eps_diff_percent', 'eps_diff_percent_abs'].mean())
 print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['eps_diff_percent', 'eps_diff_percent_abs'].var())
 
-eps_ols_6mo = smf.ols('eps_diff_percent_abs ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_6mo_analysis_pd_clean).fit()
+eps_ols_6mo = smf.ols('eps_diff_percent ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_6mo_analysis_pd_clean).fit()
 eps_ols_6mo.summary()
     ##FINDING --> it seems that EPS prediciton errors are higher when we are in the pre-period (i.e. before WS Covg)
 
-rev_ols_6mo = smf.ols('rev_diff_percent_abs ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_6mo_analysis_pd_clean).fit()
+rev_ols_6mo = smf.ols('rev_diff_percent ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_6mo_analysis_pd_clean).fit()
 rev_ols_6mo.summary() #R2 is low (but not a big deal bc we aren't predicting), P-value is significant and coefficient suggests meaningful change
     ##FINDING --> it seems that Rev prediciton errors are higher when we are in the pre-period (i.e. before WS Covg)
 
@@ -209,7 +196,6 @@ eps_ols_3mo.summary() #R2 is low (but not a big deal bc we aren't predicting), P
 
 rev_ols_3mo = smf.ols('rev_diff_percent ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_3mo_analysis_pd_clean).fit()
 rev_ols_3mo.summary() #R2 is low (but not a big deal bc we aren't predicting), P-value is significant and coefficient suggests meaningful change
-
 
 #%%Exploratory data analysis
 #Number of unique tickers

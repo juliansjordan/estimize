@@ -117,6 +117,100 @@ consensus_2 = consensus_2.loc[(consensus_2['date_to_ws'].abs() <= 180)]
 
 #Below not what I wanted but an example
 consensus_2.plot.scatter(x='date_to_ws', y = 'eps_diff_percent').set_ylim(-100,100)
+
+#%%Cleaning up data more
+
+# Get earliest, latest reporting dates from consensus data
+estimize_dateRange = consensus.groupby('ticker')['date'].min()
+estimize_dateRange =estimize_dateRange.to_frame()
+estimize_dateRange['max_date'] = consensus.groupby('ticker')['date'].max()
+
+estimize_dateRange = estimize_dateRange.rename(columns={"date": "est_min_date", "max_date": "est_max_date"})
+
+ticker_analysis_pd = estimize_dateRange.merge(FirstWS, left_on='ticker', right_on='ticker')
+ticker_analysis_pd = ticker_analysis_pd.rename(columns={"date": "ws_min_date"})
+
+#Pre-period
+
+ticker_analysis_pd['pre_period_length'] = ticker_analysis_pd['ws_min_date'] - ticker_min_preperiod['est_min_date']
+ticker_analysis_pd['pre_period_length'] = ticker_analysis_pd['pre_period_length'].dt.days
+
+#Post-period
+ticker_analysis_pd['post_period_length'] = ticker_analysis_pd['est_max_date'] - ticker_analysis_pd['ws_min_date']
+ticker_analysis_pd['post_period_length'] = ticker_analysis_pd['post_period_length'].dt.days
+
+#Create 6 mo. pre and post period
+tick_analysis_6mo_pd = ticker_analysis_pd.loc[(ticker_analysis_pd['pre_period_length'])>= cutoff]
+tick_analysis_6mo_pd = tick_analysis_6mo_pd.loc[(tick_analysis_6mo_pd['post_period_length'])>= cutoff]
+
+#Create 3 mo. pre and post period
+
+tick_analysis_3mo_pd = ticker_analysis_pd.loc[(ticker_analysis_pd['pre_period_length'])>= (cutoff/2)]
+tick_analysis_3mo_pd = tick_analysis_3mo_pd.loc[(tick_analysis_3mo_pd['post_period_length'])>= (cutoff/2)]
+
+#%%JJ to share with Lauren
+#Check to see how many times WS drops coverage
+
+consensus = consensus[consensus['eps_diff_percent_abs'] < 5] #removes some outliers (what should be the right cutoffs)
+consensus = consensus[consensus['rev_diff_percent_abs'] < 5] # same as above
+
+#Pull consensus data for tickers with 6 month pre & post
+consensus_6mo_analysis_pd = consensus.merge(tick_analysis_6mo_pd, left_on = 'ticker', right_on = 'ticker')
+consensus_6mo_analysis_pd['days_since_ws_covg'] = consensus_6mo_analysis_pd['date'] - consensus_6mo_analysis_pd['ws_min_date']
+consensus_6mo_analysis_pd['days_since_ws_covg'] = consensus_6mo_analysis_pd['days_since_ws_covg'].dt.days
+
+consensus_6mo_analysis_pd_clean = consensus_6mo_analysis_pd.loc[(abs(consensus_6mo_analysis_pd['days_since_ws_covg']) < 700)]
+
+#Plot
+plt.plot(consensus_6mo_analysis_pd_clean['days_since_ws_covg'], consensus_6mo_analysis_pd_clean['rev_diff_percent_abs'], 'o', color='black')
+plt.show()
+
+plt.plot(consensus_6mo_analysis_pd_clean['days_since_ws_covg'], consensus_6mo_analysis_pd_clean['eps_diff_percent_abs'], 'o', color='black')
+plt.show()
+
+#Add flag for pre-post
+consensus_6mo_analysis_pd_clean['pre_period'] = np.where(consensus_6mo_analysis_pd_clean['days_since_ws_covg']<0,True,False)
+
+print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent', 'rev_diff_percent_abs'].mean())
+print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent', 'rev_diff_percent_abs'].var())
+
+print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['eps_diff_percent', 'eps_diff_percent_abs'].mean())
+print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['eps_diff_percent', 'eps_diff_percent_abs'].var())
+
+eps_ols_6mo = smf.ols('eps_diff_percent_abs ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_6mo_analysis_pd_clean).fit()
+eps_ols_6mo.summary()
+    ##FINDING --> it seems that EPS prediciton errors are higher when we are in the pre-period (i.e. before WS Covg)
+
+rev_ols_6mo = smf.ols('rev_diff_percent_abs ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_6mo_analysis_pd_clean).fit()
+rev_ols_6mo.summary() #R2 is low (but not a big deal bc we aren't predicting), P-value is significant and coefficient suggests meaningful change
+    ##FINDING --> it seems that Rev prediciton errors are higher when we are in the pre-period (i.e. before WS Covg)
+
+
+
+#Pull consensus data for tickers with 3 month pre &  to test on a slightly smaller sample
+consensus_3mo_analysis_pd = consensus.merge(tick_analysis_3mo_pd, left_on = 'ticker', right_on = 'ticker')
+consensus_3mo_analysis_pd['days_since_ws_covg'] = consensus_3mo_analysis_pd['date'] - consensus_6mo_analysis_pd['ws_min_date']
+consensus_3mo_analysis_pd['days_since_ws_covg'] = consensus_3mo_analysis_pd['days_since_ws_covg'].dt.days
+
+#a lot of tickers don't have a 3 mo. pre-period, so just limiting the post-period to 3 mo.
+consensus_3mo_analysis_pd_clean = consensus_3mo_analysis_pd.loc[(consensus_3mo_analysis_pd['days_since_ws_covg'] < 90)]
+consensus_3mo_analysis_pd_clean['pre_period'] = np.where(consensus_3mo_analysis_pd_clean['days_since_ws_covg']<0,True,False)
+
+
+#Start analysis on 3 mo. data
+print(consensus_3mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent', 'rev_diff_percent_abs'].mean())
+print(consensus_3mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent', 'rev_diff_percent_abs'].var())
+
+print(consensus_3mo_analysis_pd_clean.groupby(['pre_period'])['eps_diff_percent', 'eps_diff_percent_abs'].mean())
+print(consensus_3mo_analysis_pd_clean.groupby(['pre_period'])['eps_diff_percent', 'eps_diff_percent_abs'].var())
+
+eps_ols_3mo = smf.ols('eps_diff_percent ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_3mo_analysis_pd_clean).fit()
+eps_ols_3mo.summary() #R2 is low (but not a big deal bc we aren't predicting), P-value is significant and coefficient suggests meaningful change
+
+rev_ols_3mo = smf.ols('rev_diff_percent ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_3mo_analysis_pd_clean).fit()
+rev_ols_3mo.summary() #R2 is low (but not a big deal bc we aren't predicting), P-value is significant and coefficient suggests meaningful change
+
+
 #%%Exploratory data analysis
 #Number of unique tickers
 consensus.groupby(['ticker'])['ticker'].nunique()

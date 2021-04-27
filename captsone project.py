@@ -146,7 +146,7 @@ consensus_6mo_analysis_pd = consensus.merge(tick_analysis_6mo_pd, left_on = 'tic
 consensus_6mo_analysis_pd['days_since_ws_covg'] = consensus_6mo_analysis_pd['date'] - consensus_6mo_analysis_pd['ws_min_date']
 consensus_6mo_analysis_pd['days_since_ws_covg'] = consensus_6mo_analysis_pd['days_since_ws_covg'].dt.days
 
-consensus_6mo_analysis_pd_clean = consensus_6mo_analysis_pd.loc[(abs(consensus_6mo_analysis_pd['days_since_ws_covg']) < 700)]
+consensus_6mo_analysis_pd_clean = consensus_6mo_analysis_pd.loc[(consensus_6mo_analysis_pd['days_since_ws_covg']) < 180]
 
 #Plot
 plt.plot(consensus_6mo_analysis_pd_clean['days_since_ws_covg'], consensus_6mo_analysis_pd_clean['rev_diff_percent_abs'], 'o', color='black')
@@ -196,6 +196,62 @@ eps_ols_3mo.summary() #R2 is low (but not a big deal bc we aren't predicting), P
 
 rev_ols_3mo = smf.ols('rev_diff_percent ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_3mo_analysis_pd_clean).fit()
 rev_ols_3mo.summary() #R2 is low (but not a big deal bc we aren't predicting), P-value is significant and coefficient suggests meaningful change
+
+#run a basic ttest
+
+eps_3mo_pre = consensus_3mo_analysis_pd_clean['eps_diff_percent'].loc[(consensus_3mo_analysis_pd_clean['pre_period']==True)]
+eps_3mo_post = consensus_3mo_analysis_pd_clean['eps_diff_percent'].loc[(consensus_3mo_analysis_pd_clean['pre_period']==False)]
+
+rev_3mo_pre = consensus_3mo_analysis_pd_clean['rev_diff_percent'].loc[(consensus_3mo_analysis_pd_clean['pre_period']==True)]
+rev_3mo_post = consensus_3mo_analysis_pd_clean['rev_diff_percent'].loc[(consensus_3mo_analysis_pd_clean['pre_period']==False)]
+
+eps_6mo_pre = consensus_6mo_analysis_pd_clean['eps_diff_percent'].loc[(consensus_6mo_analysis_pd_clean['pre_period']==True)]
+eps_6mo_post = consensus_6mo_analysis_pd_clean['eps_diff_percent'].loc[(consensus_6mo_analysis_pd_clean['pre_period']==False)]
+
+rev_6mo_pre = consensus_6mo_analysis_pd_clean['rev_diff_percent'].loc[(consensus_6mo_analysis_pd_clean['pre_period']==True)]
+rev_6mo_post = consensus_6mo_analysis_pd_clean['rev_diff_percent'].loc[(consensus_6mo_analysis_pd_clean['pre_period']==False)]
+
+#T-test shows that there is a difference
+stats.ttest_ind(eps_3mo_pre, eps_3mo_post)                   
+
+eps_boxplot_data = consensus_3mo_analysis_pd_clean[['eps_diff_percent', 'pre_period']]
+eps_boxplot_data['pre_period'] = np.where(eps_boxplot_data['pre_period']==True,"Pre-Period", "Post-Period")
+eps_boxplot_data.boxplot(by='pre_period')
+
+
+stats.ttest_ind(rev_3mo_pre, rev_3mo_post)    
+rev_boxplot_data = consensus_3mo_analysis_pd_clean[['rev_diff_percent', 'pre_period']]
+rev_boxplot_data['pre_period'] = np.where(rev_boxplot_data['pre_period']==True,"Pre-Period", "Post-Period")
+rev_boxplot_data.boxplot(by='pre_period')
+
+#Try histograms
+bins = np.linspace(-.5,.5,20)
+plt.hist(rev_3mo_pre, bins, alpha=1, label = 'pre')
+plt.hist(rev_3mo_post, bins, alpha=1, label = 'post')
+plt.legend(loc='upper right')
+plt.show()
+
+#Try histograms
+bins = np.linspace(-.5,.5,20)
+plt.hist(eps_3mo_pre, bins, alpha=1, label = 'pre')
+plt.hist(eps_3mo_post, bins, alpha=1, label = 'post')
+plt.legend(loc='upper right')
+plt.show()
+
+#Try histograms
+bins = np.linspace(-.5,.5,20)
+plt.hist(rev_6mo_pre, bins, alpha=1, label = 'pre')
+plt.hist(rev_6mo_post, bins, alpha=1, label = 'post')
+plt.legend(loc='upper right')
+plt.show()
+
+#Try histograms
+bins = np.linspace(-.5,.5,20)
+plt.hist(eps_6mo_pre, bins, alpha=0.5, label = 'pre')
+plt.hist(eps_6mo_post, bins, alpha=0.5, label = 'post')
+plt.legend(loc='upper right')
+plt.show()
+
 
 #%%Exploratory data analysis
 #Number of unique tickers

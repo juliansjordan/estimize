@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """
 Created on Mon Apr 12 07:05:17 2021
 @author: full team
@@ -13,21 +15,14 @@ import matplotlib.pyplot as plt
 import statsmodels.formula.api as smf # this is a version that allows us to write the model 
 import statsmodels.api as sm
 import seaborn as sns 
+import scipy.stats as stats
 
 #%%Import files
-file_path = '/Users/laurendavis/Desktop/Wharton/Spring 2021/Data Science for Finance/Final Project/Raw Data/estimize-equities-2020q4/combined_consensus_new.csv'
+file_path = 'C:/Users/jjordan/Documents/Personal/Wharton/FNCE 737/Data/'
 
-consensus = pd.read_csv(file_path)
-
-consensus.head()
-
-estimates = pd.read_csv(file_path)
-
-estimates.head()
-estimates.describe()
+consensus = pd.read_csv(file_path+'combined_unadjusted_consensus_new.csv')
 #Columns
 #Consensus: ticker, date, estimize stats (weighted avg. high, low, SD, count, for EPS, revenue), actuals
-#Estimates (granular): EPS, revenue, ticker, fiscal year, fiscal quarter, reported EPS, reported revenue, user bio, etc.
 
 #%%Clean up data and add new data elements
 # Update data types
@@ -127,13 +122,15 @@ ticker_analysis_pd['post_period_length'] = ticker_analysis_pd['est_max_date'] - 
 ticker_analysis_pd['post_period_length'] = ticker_analysis_pd['post_period_length'].dt.days
 
 #Create 6 mo. pre and post period
-tick_analysis_6mo_pd = ticker_analysis_pd.loc[(ticker_analysis_pd['pre_period_length'])>= cutoff]
-tick_analysis_6mo_pd = tick_analysis_6mo_pd.loc[(tick_analysis_6mo_pd['post_period_length'])>= cutoff]
+tick_analysis_6mo_pd = ticker_analysis_pd.loc[(ticker_analysis_pd['pre_period_length']) > cutoff]
+tick_analysis_6mo_pd = tick_analysis_6mo_pd.loc[(tick_analysis_6mo_pd['post_period_length']) > cutoff]
 
 #Create 3 mo. pre and post period
 
-tick_analysis_3mo_pd = ticker_analysis_pd.loc[(ticker_analysis_pd['pre_period_length'])>= (cutoff/2)]
-tick_analysis_3mo_pd = tick_analysis_3mo_pd.loc[(tick_analysis_3mo_pd['post_period_length'])>= (cutoff/2)]
+tick_analysis_3mo_pd = ticker_analysis_pd.loc[(ticker_analysis_pd['pre_period_length']) > (cutoff/2)]
+tick_analysis_3mo_pd = tick_analysis_3mo_pd.loc[(tick_analysis_3mo_pd['post_period_length']) > (cutoff/2)]
+
+tick_analysis_3mo_pd.groupby('ticker').nunique()
 
 #%%JJ Analysis for Lauren
 #Check to see how many times WS drops coverage
@@ -158,17 +155,17 @@ plt.show()
 #Add flag for pre-post
 consensus_6mo_analysis_pd_clean['pre_period'] = np.where(consensus_6mo_analysis_pd_clean['days_since_ws_covg']<0,True,False)
 
-print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent', 'rev_diff_percent_abs'].mean())
-print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent', 'rev_diff_percent_abs'].var())
+print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent_abs'].mean())
+print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent_abs'].std())
 
-print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['eps_diff_percent', 'eps_diff_percent_abs'].mean())
-print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['eps_diff_percent', 'eps_diff_percent_abs'].var())
+print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['eps_diff_percent_abs'].mean())
+print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['eps_diff_percent_abs'].std())
 
-eps_ols_6mo = smf.ols('eps_diff_percent ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_6mo_analysis_pd_clean).fit()
+eps_ols_6mo = smf.ols('eps_diff_percent ~ C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_6mo_analysis_pd_clean).fit()
 eps_ols_6mo.summary()
     ##FINDING --> it seems that EPS prediciton errors are higher when we are in the pre-period (i.e. before WS Covg)
 
-rev_ols_6mo = smf.ols('rev_diff_percent ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_6mo_analysis_pd_clean).fit()
+rev_ols_6mo = smf.ols('rev_diff_percent ~ C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_6mo_analysis_pd_clean).fit()
 rev_ols_6mo.summary() #R2 is low (but not a big deal bc we aren't predicting), P-value is significant and coefficient suggests meaningful change
     ##FINDING --> it seems that Rev prediciton errors are higher when we are in the pre-period (i.e. before WS Covg)
 
@@ -176,13 +173,13 @@ rev_ols_6mo.summary() #R2 is low (but not a big deal bc we aren't predicting), P
 
 #Pull consensus data for tickers with 3 month pre &  to test on a slightly smaller sample
 consensus_3mo_analysis_pd = consensus.merge(tick_analysis_3mo_pd, left_on = 'ticker', right_on = 'ticker')
-consensus_3mo_analysis_pd['days_since_ws_covg'] = consensus_3mo_analysis_pd['date'] - consensus_6mo_analysis_pd['ws_min_date']
+consensus_3mo_analysis_pd['days_since_ws_covg'] = consensus_3mo_analysis_pd['date'] - consensus_3mo_analysis_pd['ws_min_date']
 consensus_3mo_analysis_pd['days_since_ws_covg'] = consensus_3mo_analysis_pd['days_since_ws_covg'].dt.days
+
 
 #a lot of tickers don't have a 3 mo. pre-period, so just limiting the post-period to 3 mo.
 consensus_3mo_analysis_pd_clean = consensus_3mo_analysis_pd.loc[(consensus_3mo_analysis_pd['days_since_ws_covg'] < 90)]
 consensus_3mo_analysis_pd_clean['pre_period'] = np.where(consensus_3mo_analysis_pd_clean['days_since_ws_covg']<0,True,False)
-
 
 #Start analysis on 3 mo. data
 print(consensus_3mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent', 'rev_diff_percent_abs'].mean())
@@ -191,11 +188,19 @@ print(consensus_3mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent'
 print(consensus_3mo_analysis_pd_clean.groupby(['pre_period'])['eps_diff_percent', 'eps_diff_percent_abs'].mean())
 print(consensus_3mo_analysis_pd_clean.groupby(['pre_period'])['eps_diff_percent', 'eps_diff_percent_abs'].var())
 
+consensus_6mo_analysis_pd_clean['num_predictors'] = consensus_6mo_analysis_pd_clean['estimize.eps.count']
+
 eps_ols_3mo = smf.ols('eps_diff_percent ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_3mo_analysis_pd_clean).fit()
 eps_ols_3mo.summary() #R2 is low (but not a big deal bc we aren't predicting), P-value is significant and coefficient suggests meaningful change
 
 rev_ols_3mo = smf.ols('rev_diff_percent ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days', data = consensus_3mo_analysis_pd_clean).fit()
 rev_ols_3mo.summary() #R2 is low (but not a big deal bc we aren't predicting), P-value is significant and coefficient suggests meaningful change
+
+eps_ols_6mo = smf.ols('eps_diff_percent ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days + num_predictors', data = consensus_6mo_analysis_pd_clean).fit()
+eps_ols_6mo.summary() #R2 is low (but not a big deal bc we aren't predicting), P-value is significant and coefficient suggests meaningful change
+
+rev_ols_6mo = smf.ols('rev_diff_percent ~ C(ws_flag) + C(pre_period) + days_since_ws_covg + datediff_in_days + num_predictors', data = consensus_6mo_analysis_pd_clean).fit()
+rev_ols_6mo.summary() #R2 is low (but not a big deal bc we aren't predicting), P-value is significant and coefficient suggests meaningful change
 
 #run a basic ttest
 
@@ -212,17 +217,28 @@ rev_6mo_pre = consensus_6mo_analysis_pd_clean['rev_diff_percent'].loc[(consensus
 rev_6mo_post = consensus_6mo_analysis_pd_clean['rev_diff_percent'].loc[(consensus_6mo_analysis_pd_clean['pre_period']==False)]
 
 #T-test shows that there is a difference
-stats.ttest_ind(eps_3mo_pre, eps_3mo_post)                   
+stats.ttest_ind(eps_3mo_pre, eps_3mo_post)
+stats.ttest_ind(rev_3mo_pre, rev_3mo_post)                     
 
+##3 Mo.
 eps_boxplot_data = consensus_3mo_analysis_pd_clean[['eps_diff_percent', 'pre_period']]
 eps_boxplot_data['pre_period'] = np.where(eps_boxplot_data['pre_period']==True,"Pre-Period", "Post-Period")
 eps_boxplot_data.boxplot(by='pre_period')
 
-
-stats.ttest_ind(rev_3mo_pre, rev_3mo_post)    
 rev_boxplot_data = consensus_3mo_analysis_pd_clean[['rev_diff_percent', 'pre_period']]
 rev_boxplot_data['pre_period'] = np.where(rev_boxplot_data['pre_period']==True,"Pre-Period", "Post-Period")
 rev_boxplot_data.boxplot(by='pre_period')
+
+##6 MO.
+eps_boxplot_data_6mo = consensus_6mo_analysis_pd_clean[['eps_diff_percent', 'pre_period']]
+eps_boxplot_data_6mo['pre_period'] = np.where(eps_boxplot_data_6mo['pre_period']==True,"Pre-Period", "Post-Period")
+eps_boxplot_data_6mo.boxplot(by='pre_period')
+stats.ttest_ind(eps_6mo_pre, eps_6mo_post)    
+
+rev_boxplot_data_6mo = consensus_6mo_analysis_pd_clean[['rev_diff_percent', 'pre_period']]
+rev_boxplot_data_6mo['pre_period'] = np.where(rev_boxplot_data_6mo['pre_period']==True,"Pre-Period", "Post-Period")
+rev_boxplot_data_6mo.boxplot(by='pre_period')
+stats.ttest_ind(rev_6mo_pre, rev_6mo_post)    
 
 #Try histograms
 bins = np.linspace(-.5,.5,20)
@@ -253,6 +269,16 @@ plt.legend(loc='upper right')
 plt.show()
 
 
+
+#%% Create DataFrame that has estimates in relation to First instance of WS <-- NEEDS UPDATING BASED ON ABOVE
+
+consensus_2 = consensus.merge(FirstWS, how='left', left_on='ticker', right_on='ticker', suffixes=(None, "_WS"))
+consensus_2['date_to_ws'] = consensus_2['date']-consensus_2['date_WS']
+consensus_2['date_to_ws'] = consensus_2['date_to_ws'].astype("timedelta64[D]")
+consensus_2 = consensus_2.loc[(consensus_2['date_to_ws'].abs() <= 180)]
+
+#Below not what I wanted but an example
+consensus_2.plot.scatter(x='date_to_ws', y = 'eps_diff_percent').set_ylim(-100,100)
 #%%Exploratory data analysis
 #Number of unique tickers
 consensus.groupby(['ticker'])['ticker'].nunique()

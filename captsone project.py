@@ -74,10 +74,10 @@ consensus['rev_diff_percent_ws_abs'] = consensus[['rev_diff_percent_ws']].abs()
 cutoff = 180   # required days on either side of teh WS flag
 
 # Find first instane a ticker has no wall street estimate
-FirstEST = consensus[['ticker', 'date', 'ws_flag']]
-FirstEST = FirstEST[FirstEST['ws_flag'] == False]
-FirstEST = FirstEST.groupby('ticker')['date'].min()
-FirstEST = FirstEST.to_frame()
+LastEST = consensus[['ticker', 'date', 'ws_flag']]
+LastEST = LastEST[LastEST['ws_flag'] == False]
+LastEST = LastEST.groupby('ticker')['date'].max()
+LastEST = LastEST.to_frame()
 
 # Get All data with a wall street estimate
 FirstWS = consensus[['ticker', 'date', 'ws_flag']]
@@ -96,17 +96,25 @@ WSData = FirstWS.merge(LastWS, how='outer', left_on='ticker', right_on='ticker',
 WSData['WS_Duration'] = WSData['date_Max'] - WSData['date_Min']
 WSData['WS_Duration'] = WSData['WS_Duration'].astype("timedelta64[D]")
 
-# Keep only instanes with a wallstreet coverage duration longer than cutoff
-WSData = WSData.loc[(WSData['WS_Duration']) >= cutoff]
-
 # Merge wall street data with estimize estimate data
-TickerPull = FirstEST.merge(WSData, how='outer', left_on='ticker', right_on='ticker', suffixes=("_False", "_True"))
-TickerPull['EstDur'] = TickerPull['date_Min'] - TickerPull['date']
-TickerPull['EstDur'] = TickerPull['EstDur'].astype("timedelta64[D]")
+WSDrop = LastEST.merge(WSData, how='outer', left_on='ticker', right_on='ticker', suffixes=("_False", "_True"))
+
+# Find instances where Wallstreet dropped coverage
+WSDrop = WSDrop[(WSDrop['date']) > WSDrop['date_Max']] 
+WSDrop['Pre_Drop_Period'] = WSDrop['date_Max'] - WSDrop['date_Min']
+WSDrop['Pre_Drop_Period'] = WSDrop['Pre_Drop_Period'].dt.days
+WSDrop['Post_Drop_Period'] = WSDrop['date'] - WSDrop['date_Max']
+WSDrop['Post_Drop_Period']= WSDrop['Post_Drop_Period'].dt.days
+
+# Limit to instances where there are 90 days of coverage on either side of drop
+WSDrop = WSDrop[WSDrop['Pre_Drop_Period'] > 90]
+WSDrop = WSDrop[WSDrop['Post_Drop_Period'] > 90]
+#TickerPull['EstDur'] = TickerPull['EstDur'].astype("timedelta64[D]")
 
 # Keep only instances with an estimize only duration greater than cutoff
-TickerPull = TickerPull.loc[(TickerPull['EstDur']) >= cutoff]
+#TickerPull = TickerPull.loc[(TickerPull['EstDur']) >= cutoff]
 
+#%% Does the same thing as above
 # Get earliest, latest reporting dates from consensus data
 estimize_dateRange = consensus.groupby('ticker')['date'].min()
 estimize_dateRange =estimize_dateRange.to_frame()
@@ -126,7 +134,7 @@ ticker_analysis_pd['pre_period_length'] = ticker_analysis_pd['pre_period_length'
 ticker_analysis_pd['post_period_length'] = ticker_analysis_pd['est_max_date'] - ticker_analysis_pd['ws_min_date']
 ticker_analysis_pd['post_period_length'] = ticker_analysis_pd['post_period_length'].dt.days
 
-#Create 6 mo. pre and post period
+#Create 6 mo. pre and post   <--- this is everything outside of that range
 tick_analysis_6mo_pd = ticker_analysis_pd.loc[(ticker_analysis_pd['pre_period_length'])>= cutoff]
 tick_analysis_6mo_pd = tick_analysis_6mo_pd.loc[(tick_analysis_6mo_pd['post_period_length'])>= cutoff]
 
@@ -134,6 +142,7 @@ tick_analysis_6mo_pd = tick_analysis_6mo_pd.loc[(tick_analysis_6mo_pd['post_peri
 
 tick_analysis_3mo_pd = ticker_analysis_pd.loc[(ticker_analysis_pd['pre_period_length'])>= (cutoff/2)]
 tick_analysis_3mo_pd = tick_analysis_3mo_pd.loc[(tick_analysis_3mo_pd['post_period_length'])>= (cutoff/2)]
+
 
 #%%JJ Analysis for Lauren
 #Check to see how many times WS drops coverage
@@ -149,15 +158,18 @@ consensus_6mo_analysis_pd['days_since_ws_covg'] = consensus_6mo_analysis_pd['day
 consensus_6mo_analysis_pd_clean = consensus_6mo_analysis_pd.loc[(consensus_6mo_analysis_pd['days_since_ws_covg']) < 180]
 
 #Plot
-plt.plot(consensus_6mo_analysis_pd_clean['days_since_ws_covg'], consensus_6mo_analysis_pd_clean['rev_diff_percent_abs'], 'o', color='black')
+plt.scatter(consensus_6mo_analysis_pd_clean['days_since_ws_covg'], consensus_6mo_analysis_pd_clean['rev_diff_percent'])
+plt.xlim(-180,180)
 plt.show()
 
-plt.plot(consensus_6mo_analysis_pd_clean['days_since_ws_covg'], consensus_6mo_analysis_pd_clean['eps_diff_percent_abs'], 'o', color='black')
+plt.scatter(consensus_6mo_analysis_pd_clean['days_since_ws_covg'], consensus_6mo_analysis_pd_clean['eps_diff_percent'])
+plt.xlim(-180,180)
 plt.show()
 
 #Add flag for pre-post
 consensus_6mo_analysis_pd_clean['pre_period'] = np.where(consensus_6mo_analysis_pd_clean['days_since_ws_covg']<0,True,False)
 
+print("Six Month Evaluation")
 print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent', 'rev_diff_percent_abs'].mean())
 print(consensus_6mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent', 'rev_diff_percent_abs'].var())
 
@@ -185,6 +197,7 @@ consensus_3mo_analysis_pd_clean['pre_period'] = np.where(consensus_3mo_analysis_
 
 
 #Start analysis on 3 mo. data
+print("Three Month Evaluation")
 print(consensus_3mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent', 'rev_diff_percent_abs'].mean())
 print(consensus_3mo_analysis_pd_clean.groupby(['pre_period'])['rev_diff_percent', 'rev_diff_percent_abs'].var())
 
@@ -224,7 +237,7 @@ rev_boxplot_data = consensus_3mo_analysis_pd_clean[['rev_diff_percent', 'pre_per
 rev_boxplot_data['pre_period'] = np.where(rev_boxplot_data['pre_period']==True,"Pre-Period", "Post-Period")
 rev_boxplot_data.boxplot(by='pre_period')
 
-#Try histograms
+#Try histograms -- 
 bins = np.linspace(-.5,.5,20)
 plt.hist(rev_3mo_pre, bins, alpha=1, label = 'pre')
 plt.hist(rev_3mo_post, bins, alpha=1, label = 'post')

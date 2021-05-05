@@ -142,7 +142,8 @@ consensus = consensus[consensus['rev_diff_percent_abs'] < 2] # same as above
 consensus_6mo_analysis_pd = consensus.merge(tick_analysis_6mo_pd, left_on = 'ticker', right_on = 'ticker')
 consensus_6mo_analysis_pd['days_since_ws_covg'] = consensus_6mo_analysis_pd['date'] - consensus_6mo_analysis_pd['ws_min_date']
 consensus_6mo_analysis_pd['days_since_ws_covg'] = consensus_6mo_analysis_pd['days_since_ws_covg'].dt.days
-
+consensus_6mo_analysis_pd['days_since_est_covg'] = consensus_6mo_analysis_pd['date'] - consensus_6mo_analysis_pd['est_min_date']
+consensus_6mo_analysis_pd['days_since_est_covg'] = consensus_6mo_analysis_pd['days_since_est_covg'].dt.days
 
 consensus_6mo_analysis_pd_clean = consensus_6mo_analysis_pd.loc[(consensus_6mo_analysis_pd['days_since_ws_covg']) < 180]
 
@@ -272,7 +273,6 @@ plt.show()
 
 #%% Analyze ability to get better with time
 
-# Check to see if days since est coverage predicts ability to predicts estimate accuracy
 
 consensus_6mo_analysis_pd['num_predictors'] = consensus_6mo_analysis_pd['estimize.eps.count']
 
@@ -285,7 +285,14 @@ eps_ols_6mo_DaysOnly.summary()  # No Significant Effect due to time since est co
 rev_ols_6mo_DaysOnly = smf.ols('rev_diff_percent ~ C(ws_flag) + days_since_est_covg + datediff_in_days + num_predictors', data = consensus_6mo_analysis_pd).fit()
 rev_ols_6mo_DaysOnly.summary()  # No Significant Effect due to time since est coverage
 
- 
+# Check to see if days since est coverage predicts ability to predicts estimate accuracy
+
+eps_ols_6mo = smf.ols('eps_diff_percent ~ C(ws_flag) + C(pre_period) + days_since_est_covg + days_since_ws_covg + datediff_in_days + num_predictors', data = consensus_6mo_analysis_pd_clean).fit()
+eps_ols_6mo.summary() #Days since est coverage is not significant
+
+rev_ols_6mo = smf.ols('rev_diff_percent ~ C(ws_flag) + C(pre_period) + days_since_est_covg + days_since_ws_covg + datediff_in_days + num_predictors', data = consensus_6mo_analysis_pd_clean).fit()
+rev_ols_6mo.summary() #Days since est coverage is not significant
+
 
 #%% Create DataFrame that has estimates in relation to First instance of WS <-- NEEDS UPDATING BASED ON ABOVE
 
